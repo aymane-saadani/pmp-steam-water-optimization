@@ -1,0 +1,662 @@
+<!DOCTYPE html>
+<html lang="fr" class="h-full">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PMP — Dashboard de Pilotage Eau-Vapeur</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<script>
+tailwind.config = {
+  theme: {
+    extend: {
+      colors: {
+        pmp: {
+          dark: '#1E2822',
+          sage: '#31473C',
+          soft: '#A2B189',
+          light: '#DBD8CD',
+          accent: '#2E7D32',
+          gold: '#D4AF37',
+        }
+      },
+      fontFamily: { sans: ['Inter', 'sans-serif'] }
+    }
+  }
+}
+</script>
+<style>
+  body { font-family: 'Inter', sans-serif; background-color: #F4F6F5; color: #1E2822; }
+  .card-shadow { box-shadow: 0 4px 15px -1px rgba(49,71,60,.07), 0 2px 6px -1px rgba(49,71,60,.04); }
+  .custom-slider { -webkit-appearance: none; appearance: none; height: 8px; border-radius: 8px; background: #E2E8F0; }
+  .custom-slider::-webkit-slider-thumb {
+    -webkit-appearance: none; width: 20px; height: 20px; border-radius: 50%;
+    background: #31473C; cursor: pointer; border: 2px solid #fff; box-shadow: 0 2px 4px rgba(0,0,0,.2);
+  }
+  .custom-slider::-moz-range-thumb {
+    width: 20px; height: 20px; border-radius: 50%; background: #31473C; cursor: pointer;
+    border: 2px solid #fff; box-shadow: 0 2px 4px rgba(0,0,0,.2);
+  }
+  .tab-btn.active { background: #31473C; color: #fff; box-shadow: 0 2px 8px rgba(49,71,60,.25); }
+  .gauge-fill { height: 100%; background: #A2B189; transition: width .25s; }
+  .gauge-fill.over { background: #B5533C; }
+  table.data { width: 100%; border-collapse: collapse; }
+  table.data th {
+    font-size: 10px; text-transform: uppercase; letter-spacing: .06em; padding: 8px 10px;
+    text-align: right; background: #31473C; color: #fff; font-weight: 600;
+  }
+  table.data th:first-child, table.data td:first-child { text-align: left; }
+  table.data td { font-size: 12.5px; padding: 7px 10px; text-align: right; border-bottom: 1px solid #F1F5F4; }
+  table.data tr:nth-child(even) td { background: #F8FAF9; }
+  table.data tr.out td { color: #94A3B8; }
+  table.data tr.opt td { font-weight: 700; background: #EEF3EA; }
+</style>
+</head>
+<body class="min-h-screen flex flex-col">
+
+<header class="bg-pmp-sage text-white shadow-md sticky top-0 z-50">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
+    <div class="flex flex-col md:flex-row justify-between items-center space-y-3 md:space-y-0">
+      <div class="flex items-center space-x-3">
+        <div class="w-10 h-10 rounded-lg bg-pmp-soft flex items-center justify-center text-pmp-sage font-bold text-xl shadow-inner">
+          <i class="fa-solid fa-bolt"></i>
+        </div>
+        <div>
+          <h1 class="text-lg md:text-xl font-bold tracking-tight">PMP — Dashboard de Pilotage Eau-Vapeur</h1>
+          <p class="text-xs text-pmp-light opacity-90">Groupe OCP — Complexe Industriel Jorf Lasfar · Modèle officiel Ch.6 · <code class="text-[10px] opacity-80">transform.py</code></p>
+        </div>
+      </div>
+      <div class="flex items-center space-x-3">
+        <div class="flex items-center space-x-2 bg-pmp-dark/40 px-3 py-1.5 rounded-full border border-pmp-soft/30 text-xs">
+          <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
+          <span class="font-medium text-emerald-100">Grille officielle : active</span>
+        </div>
+        <div class="hidden sm:flex items-center space-x-2 bg-pmp-dark/40 px-3 py-1.5 rounded-full border border-pmp-soft/30 text-xs">
+          <i class="fa-solid fa-database text-pmp-soft"></i>
+          <span class="text-slate-200">Pipeline Python</span>
+        </div>
+        <button onclick="exportReport()" class="bg-pmp-soft hover:bg-emerald-600 text-pmp-dark hover:text-white px-3.5 py-1.5 rounded-lg font-medium text-xs transition duration-200 shadow flex items-center space-x-1.5">
+          <i class="fa-solid fa-file-arrow-down"></i>
+          <span class="hidden md:inline">Exporter</span>
+        </button>
+      </div>
+    </div>
+  </div>
+</header>
+
+<main class="max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 flex-grow space-y-6">
+
+  <div>
+    <p class="text-xs font-semibold uppercase tracking-wider text-slate-500 mb-2">
+      Synthèse historique <span class="font-normal normal-case tracking-normal text-slate-400">— calculée une fois par le pipeline (17 mois). Ne bouge pas avec le curseur ci-dessous.</span>
+    </p>
+    <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4" id="headline">
+    <div class="bg-white rounded-xl p-4 card-shadow border-l-4 border-pmp-sage">
+      <div class="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">ProdSAP* (prix central)</div>
+      <div class="mt-2 text-2xl font-bold text-pmp-sage" id="hiStar">–</div>
+      <div class="mt-1 text-[11px] text-emerald-600 flex items-center font-medium"><i class="fa-solid fa-bullseye mr-1"></i> Point optimal du modèle</div>
+    </div>
+    <div class="bg-white rounded-xl p-4 card-shadow border-l-4 border-emerald-500 bg-gradient-to-br from-white to-emerald-50">
+      <div class="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Réalisation de marge</div>
+      <div class="mt-2 text-2xl font-bold text-emerald-700" id="hiReal">–</div>
+      <div class="mt-1 text-[11px] text-emerald-700 font-medium"><i class="fa-solid fa-chart-line mr-1"></i> Backtesting, régime nominal</div>
+    </div>
+    <div class="bg-white rounded-xl p-4 card-shadow border-l-4 border-amber-500">
+      <div class="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Manque à gagner</div>
+      <div class="mt-2 text-2xl font-bold text-amber-800" id="hiGap">–</div>
+      <div class="mt-1 text-[11px] text-amber-700 font-medium"><i class="fa-solid fa-scale-unbalanced mr-1"></i> Écart vs modèle à charge égale</div>
+    </div>
+    <div class="bg-white rounded-xl p-4 card-shadow border-l-4 border-pmp-soft">
+      <div class="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Conso. spécifique nominale</div>
+      <div class="mt-2 text-2xl font-bold text-slate-800" id="hiKpi1">–</div>
+      <div class="mt-1 text-[11px] text-slate-500 flex items-center"><i class="fa-solid fa-gauge-high mr-1 text-pmp-sage"></i> kg vapeur / t H₂SO₄</div>
+    </div>
+    </div>
+  </div>
+
+  <div class="flex flex-wrap gap-2">
+    <button class="tab-btn active px-4 py-2 rounded-lg text-sm font-semibold bg-white text-pmp-sage border border-slate-200 card-shadow" data-mode="demo"><i class="fa-solid fa-sliders mr-1.5"></i>Pilotage</button>
+    <button class="tab-btn px-4 py-2 rounded-lg text-sm font-semibold bg-white text-pmp-sage border border-slate-200 card-shadow" data-mode="historique"><i class="fa-solid fa-clock-rotate-left mr-1.5"></i>Historique</button>
+    <button class="tab-btn px-4 py-2 rounded-lg text-sm font-semibold bg-white text-pmp-sage border border-slate-200 card-shadow" data-mode="backtest"><i class="fa-solid fa-magnifying-glass-chart mr-1.5"></i>Backtesting</button>
+    <button class="tab-btn px-4 py-2 rounded-lg text-sm font-semibold bg-white text-pmp-sage border border-slate-200 card-shadow" data-mode="sensi"><i class="fa-solid fa-wave-square mr-1.5"></i>Sensibilité</button>
+  </div>
+
+  <!-- PILOTAGE -->
+  <div class="grid grid-cols-1 lg:grid-cols-12 gap-6" id="modeDemo">
+    <section class="lg:col-span-4 bg-white rounded-xl card-shadow p-5 border border-slate-200 space-y-5">
+      <div class="border-b border-slate-200 pb-3 flex justify-between items-center">
+        <h2 class="text-base font-bold text-pmp-sage flex items-center space-x-2">
+          <i class="fa-solid fa-sliders text-pmp-soft"></i>
+          <span>Entrées — modèle officiel</span>
+        </h2>
+        <button onclick="resetDefaults()" class="text-xs text-slate-500 hover:text-pmp-sage underline">Réinitialiser</button>
+      </div>
+
+      <div>
+        <div class="flex justify-between items-center mb-1">
+          <label class="text-xs font-semibold text-slate-700">Charge SAP (H₂SO₄)</label>
+          <div class="flex items-center space-x-1">
+            <input type="number" id="inputSap" value="103500" min="40000" max="135000" step="500"
+                   class="w-24 text-right px-2 py-1 text-xs font-bold border border-slate-300 rounded bg-slate-50 focus:outline-none focus:ring-1 focus:ring-pmp-sage">
+            <span class="text-[11px] text-slate-500">t/mois</span>
+          </div>
+        </div>
+        <input type="range" id="prodSAP" min="40000" max="135000" step="500" value="103500" class="w-full custom-slider cursor-pointer">
+        <div class="flex justify-between text-[10px] text-slate-400 mt-1">
+          <span>40 000</span>
+          <span class="font-medium text-pmp-sage" id="valProdSAP">103 500</span>
+          <span>135 000</span>
+        </div>
+      </div>
+
+      <div>
+        <label class="block text-xs font-semibold text-slate-700 mb-2">Régime catalyseur</label>
+        <div class="grid grid-cols-3 gap-2">
+          <label class="cursor-pointer">
+            <input type="radio" name="regime" value="normal" checked class="peer sr-only">
+            <div class="p-2 text-center rounded-lg border border-slate-300 peer-checked:border-pmp-sage peer-checked:bg-pmp-sage/10 peer-checked:text-pmp-sage text-slate-600 transition">
+              <div class="text-[11px] font-bold">Terrain</div>
+              <div class="text-[10px] text-slate-500">facteur 1.00</div>
+            </div>
+          </label>
+          <label class="cursor-pointer">
+            <input type="radio" name="regime" value="clean" class="peer sr-only">
+            <div class="p-2 text-center rounded-lg border border-slate-300 peer-checked:border-pmp-sage peer-checked:bg-pmp-sage/10 peer-checked:text-pmp-sage text-slate-600 transition">
+              <div class="text-[11px] font-bold"><i class="fa-solid fa-sparkles mr-0.5"></i> Clean</div>
+              <div class="text-[10px] text-slate-500">constructeur</div>
+            </div>
+          </label>
+          <label class="cursor-pointer">
+            <input type="radio" name="regime" value="dirty" class="peer sr-only">
+            <div class="p-2 text-center rounded-lg border border-slate-300 peer-checked:border-amber-600 peer-checked:bg-amber-50 peer-checked:text-amber-800 text-slate-600 transition">
+              <div class="text-[11px] font-bold"><i class="fa-solid fa-smog mr-0.5"></i> Dirty</div>
+              <div class="text-[10px] text-slate-500">stream 109</div>
+            </div>
+          </label>
+        </div>
+      </div>
+
+      <div>
+        <label class="block text-xs font-semibold text-slate-700 mb-1">Tranche tarifaire ONE</label>
+        <select id="tranche" class="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg bg-slate-50 focus:outline-none focus:ring-1 focus:ring-pmp-sage">
+          <option value="basse">Creuses — 241,73 DH/MWh</option>
+          <option value="centrale" selected>Centrale — 386,55 DH/MWh</option>
+          <option value="haute">Pointe — 578,16 DH/MWh</option>
+        </select>
+      </div>
+
+      <div>
+        <label class="block text-xs font-semibold text-slate-700 mb-2">Disponibilité chaudières HR</label>
+        <div class="space-y-2 bg-slate-50 p-3 rounded-lg border border-slate-200">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-medium text-slate-700">Chaudière HR1</span>
+            <label class="relative inline-flex items-center cursor-pointer">
+              <input type="checkbox" id="ch1" checked class="sr-only peer">
+              <div class="w-9 h-5 bg-slate-300 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-pmp-sage"></div>
+            </label>
+          </div>
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-medium text-slate-700">Chaudière HR2</span>
+            <label class="relative inline-flex items-center cursor-pointer">
+              <input type="checkbox" id="ch2" checked class="sr-only peer">
+              <div class="w-9 h-5 bg-slate-300 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-pmp-sage"></div>
+            </label>
+          </div>
+        </div>
+        <p class="text-[11px] text-slate-500 mt-2 leading-relaxed">Maintenance chaudière = 0 DH dans le chiffrage officiel. Les interrupteurs servent d’alerte capacité (87,8 t/h chacune).</p>
+      </div>
+    </section>
+
+    <section class="lg:col-span-8 space-y-6">
+      <div class="bg-white p-5 rounded-xl card-shadow border border-slate-200">
+        <div class="flex justify-between items-center mb-4">
+          <h3 class="text-sm font-bold text-pmp-sage flex items-center space-x-2">
+            <i class="fa-solid fa-chart-pie text-pmp-soft"></i>
+            <span>Répartition vapeur (t/h)</span>
+          </h3>
+        </div>
+        <div class="flex h-9 rounded-lg overflow-hidden border border-slate-200">
+          <div class="seg-turbine bg-pmp-sage text-white text-[11px] font-medium flex items-center justify-center" id="segTurbine"></div>
+          <div class="seg-bypass bg-red-600 text-white text-[11px] font-medium flex items-center justify-center" id="segBypass"></div>
+        </div>
+        <div class="flex flex-wrap gap-4 mt-3 text-xs text-slate-600">
+          <span><i class="inline-block w-2.5 h-2.5 rounded-sm bg-pmp-sage mr-1"></i>Export turbine GTA</span>
+          <span><i class="inline-block w-2.5 h-2.5 rounded-sm bg-red-600 mr-1"></i>Bypass PV-050A</span>
+        </div>
+        <div class="mt-5">
+          <div class="flex justify-between text-xs mb-1">
+            <span class="text-slate-600">Charge turbine vs plafond 138,2 t/h</span>
+            <span class="font-bold text-pmp-sage" id="valGauge">–</span>
+          </div>
+          <div class="h-3 bg-slate-100 rounded-full overflow-hidden"><div class="gauge-fill" id="gaugeFill"></div></div>
+        </div>
+        <div id="alertBypass" class="hidden mt-4 p-3 rounded-lg text-sm font-medium bg-red-50 text-red-800 border border-red-200"></div>
+        <div id="alertInfo" class="hidden mt-3 p-3 rounded-lg text-sm font-medium bg-emerald-50 text-pmp-sage border border-pmp-soft/40"></div>
+      </div>
+
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div class="bg-white rounded-xl p-4 card-shadow border-l-4 border-pmp-sage">
+          <div class="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Électricité exportée</div>
+          <div class="mt-2 text-xl font-bold text-pmp-sage" id="kpiMwh">–</div>
+        </div>
+        <div class="bg-white rounded-xl p-4 card-shadow border-l-4 border-pmp-soft">
+          <div class="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Marge à cette charge</div>
+          <div class="mt-2 text-xl font-bold text-slate-800" id="kpiMarge">–</div>
+        </div>
+        <div class="bg-white rounded-xl p-4 card-shadow border-l-4 border-emerald-500">
+          <div class="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Marge au ProdSAP* du scénario</div>
+          <div class="mt-2 text-xl font-bold text-emerald-700" id="kpiMargeStar">–</div>
+        </div>
+        <div class="bg-white rounded-xl p-4 card-shadow border-l-4 border-amber-500">
+          <div class="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Écart vs optimum de prix</div>
+          <div class="mt-2 text-xl font-bold" id="kpiEco">–</div>
+        </div>
+      </div>
+      <p class="text-[11px] text-slate-500 leading-relaxed bg-pmp-light/30 p-3 rounded-lg border border-pmp-light/50" id="modelNote">
+        <i class="fa-solid fa-shield-halved text-pmp-sage mr-1"></i>
+        e_brut = a·ProdSAP² + b·ProdSAP + c, export plafonné à 138,2 t/h × 730,5 h,
+        MWh = export / 5,02, marge = prix × MWh − 19,61 × ProdSAP × 1,0414.
+        Demande PAP non chiffrée (§6.5.3).
+      </p>
+    </section>
+  </div>
+
+  <!-- HISTORIQUE -->
+  <div class="hidden space-y-4" id="modeHistorique">
+    <div class="bg-white p-5 rounded-xl card-shadow border border-slate-200">
+      <h2 class="text-base font-bold text-pmp-sage flex items-center space-x-2 mb-3">
+        <i class="fa-solid fa-clock-rotate-left text-pmp-soft"></i><span>Historique réel</span>
+      </h2>
+      <p class="text-xs text-slate-500 mb-3" id="histStatus">Chargement…</p>
+      <svg class="w-full h-40" id="chartProd" viewBox="0 0 800 160" preserveAspectRatio="none"></svg>
+      <p class="text-xs text-slate-400 mt-1">ProdSAP (t/mois) — ligne pointillée : seuil de régime nominal (85 000 t).</p>
+      <div class="overflow-auto mt-4 rounded-lg border border-slate-200">
+        <table class="data" id="histTable"></table>
+      </div>
+      <p class="text-[11px] text-slate-500 mt-3" id="histRegressionNote"></p>
+    </div>
+  </div>
+
+  <!-- BACKTEST -->
+  <div class="hidden space-y-4" id="modeBacktest">
+    <div class="bg-white p-5 rounded-xl card-shadow border border-slate-200">
+      <h2 class="text-base font-bold text-pmp-sage flex items-center space-x-2 mb-3">
+        <i class="fa-solid fa-magnifying-glass-chart text-pmp-soft"></i>
+        <span>Backtesting — marge réelle vs modèle à charge SAP identique</span>
+      </h2>
+      <p class="text-xs text-slate-500 mb-4" id="btStatus"></p>
+      <div id="btBars" class="mb-4"></div>
+      <div class="overflow-auto rounded-lg border border-slate-200">
+        <table class="data" id="btTable"></table>
+      </div>
+    </div>
+  </div>
+
+  <!-- SENSIBILITE -->
+  <div class="hidden grid-cols-1 lg:grid-cols-12 gap-6" id="modeSensi">
+    <div class="lg:col-span-5 bg-white p-5 rounded-xl card-shadow border border-slate-200">
+      <h2 class="text-base font-bold text-pmp-sage mb-3">§6.5.1 Charge SAP autour de ProdSAP*</h2>
+      <svg class="w-full h-40" id="chartSensi" viewBox="0 0 800 160" preserveAspectRatio="none"></svg>
+      <div class="overflow-auto mt-3 rounded-lg border border-slate-200">
+        <table class="data" id="sensiTable"></table>
+      </div>
+    </div>
+    <div class="lg:col-span-7 space-y-6">
+      <div class="bg-white p-5 rounded-xl card-shadow border border-slate-200">
+        <h2 class="text-base font-bold text-pmp-sage mb-3">§6.5.2 Clean / Dirty (321045.pdf)</h2>
+        <div id="dirtyCards" class="grid grid-cols-1 sm:grid-cols-2 gap-4"></div>
+        <p class="text-[11px] text-slate-500 mt-3 leading-relaxed" id="sensiNote"></p>
+      </div>
+      <div class="bg-white p-5 rounded-xl card-shadow border border-slate-200">
+        <h2 class="text-base font-bold text-pmp-sage mb-3">Point optimal par hypothèse de prix</h2>
+        <label class="text-xs font-semibold text-slate-700">Scénario</label>
+        <select id="scenarioSelect" class="mt-1 w-full max-w-xs px-3 py-2 text-sm border border-slate-300 rounded-lg bg-slate-50">
+          <option value="basse">Basse (heures creuses)</option>
+          <option value="centrale" selected>Centrale</option>
+          <option value="haute">Haute (pointe)</option>
+        </select>
+        <div class="grid grid-cols-2 gap-4 mt-4">
+          <div class="bg-slate-50 rounded-lg p-3 border border-slate-200">
+            <div class="text-[10px] uppercase tracking-wider text-slate-500 font-semibold">ProdSAP*</div>
+            <div class="text-lg font-bold text-pmp-sage" id="histProdSAP">–</div>
+          </div>
+          <div class="bg-slate-50 rounded-lg p-3 border border-slate-200">
+            <div class="text-[10px] uppercase tracking-wider text-slate-500 font-semibold">Export GTA*</div>
+            <div class="text-lg font-bold text-pmp-sage" id="histExport">–</div>
+          </div>
+          <div class="bg-slate-50 rounded-lg p-3 border border-slate-200">
+            <div class="text-[10px] uppercase tracking-wider text-slate-500 font-semibold">Bypass*</div>
+            <div class="text-lg font-bold text-pmp-sage" id="histBypass">–</div>
+          </div>
+          <div class="bg-slate-50 rounded-lg p-3 border border-slate-200">
+            <div class="text-[10px] uppercase tracking-wider text-slate-500 font-semibold">Marge*</div>
+            <div class="text-lg font-bold text-pmp-sage" id="histMarge">–</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</main>
+
+<footer class="bg-pmp-dark text-pmp-light/80 text-xs py-4 mt-auto">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 flex flex-col sm:flex-row justify-between gap-2">
+    <span>Pipeline de pilotage PMP · constantes identiques à transform.py</span>
+    <span>OCP Jorf Lasfar · Chapitre 6</span>
+  </div>
+</footer>
+
+<script src="output/dashboard_data.js"></script>
+<script>
+const FALLBACK_C = {
+  CAP_GTA: 138.2, HEURES_MOIS: 730.5, RATIO_TURBINE: 5.02, TAU_PURGE_TOTAL: 0.0414,
+  CAP_CHAUDIERE_UNIT: 87.8, COEF_A: -0.00000105, COEF_B: 1.16998, COEF_C: -8888.17,
+  C_EAU: 19.61, C_MAINT_UNIT: 0, P_ELEC_BASSE: 241.73, P_ELEC_CENTRALE: 386.55, P_ELEC_HAUTE: 578.16
+};
+const DIRTY_FACTOR = 128811 / 131008;
+
+function fmt(n, dec=0){
+  if (n == null || Number.isNaN(n)) return '–';
+  return Number(n).toLocaleString('fr-FR', {minimumFractionDigits:dec, maximumFractionDigits:dec});
+}
+
+let DATA = window.PIPELINE_DATA || null;
+let C = FALLBACK_C;
+
+function evaluatePoint(prodSAP, prix, facteur=1){
+  const eBrut = C.COEF_A * prodSAP**2 + C.COEF_B * prodSAP + C.COEF_C;
+  const cap = C.CAP_GTA * C.HEURES_MOIS;
+  const eExport = Math.min(eBrut, cap) * facteur;
+  const bypass = prodSAP - eExport;
+  const mwh = eExport / C.RATIO_TURBINE;
+  const coutEau = C.C_EAU * prodSAP * (1 + C.TAU_PURGE_TOTAL);
+  const nbCh = (prodSAP / C.HEURES_MOIS <= C.CAP_CHAUDIERE_UNIT) ? 1 : 2;
+  const marge = prix * mwh - coutEau - nbCh * C.C_MAINT_UNIT;
+  return {eBrut, eExport, bypass, mwh, nbCh, marge};
+}
+
+function prixTranche(key){
+  return {basse: C.P_ELEC_BASSE, centrale: C.P_ELEC_CENTRALE, haute: C.P_ELEC_HAUTE}[key];
+}
+
+function facteurRegime(){
+  const r = document.querySelector('input[name=regime]:checked').value;
+  return r === 'dirty' ? DIRTY_FACTOR : 1.0;
+}
+
+function recalc(){
+  const prodSAP = +document.getElementById('prodSAP').value;
+  const tranche = document.getElementById('tranche').value;
+  const prix = prixTranche(tranche);
+  const fac = facteurRegime();
+  const ch1 = document.getElementById('ch1').checked;
+  const ch2 = document.getElementById('ch2').checked;
+  const nbDispo = (ch1?1:0)+(ch2?1:0);
+
+  document.getElementById('valProdSAP').textContent = fmt(prodSAP);
+  document.getElementById('inputSap').value = prodSAP;
+  const pt = evaluatePoint(prodSAP, prix, fac);
+  const hpT = pt.eExport / C.HEURES_MOIS;
+  const byT = Math.max(pt.bypass, 0) / C.HEURES_MOIS;
+  const total = Math.max(hpT + byT, 0.0001);
+
+  const pct = v => (v/total*100).toFixed(1)+'%';
+  document.getElementById('segTurbine').style.width = pct(hpT);
+  document.getElementById('segBypass').style.width = pct(Math.max(byT,0));
+  document.getElementById('segTurbine').textContent = hpT>total*0.08 ? fmt(hpT,1)+' t/h' : '';
+  document.getElementById('segBypass').textContent = byT>total*0.08 ? fmt(byT,1)+' t/h' : '';
+
+  const chargePct = Math.min(hpT / C.CAP_GTA * 100, 100);
+  document.getElementById('valGauge').textContent = fmt(chargePct,1)+' %';
+  const g = document.getElementById('gaugeFill');
+  g.style.width = chargePct+'%';
+  g.classList.toggle('over', chargePct>=99.5);
+
+  const alertB = document.getElementById('alertBypass');
+  if (byT > 2){
+    alertB.classList.remove('hidden');
+    alertB.innerHTML = '<i class="fa-solid fa-triangle-exclamation mr-1"></i> Bypass : '+fmt(byT,1)+' t/h ('+fmt(pt.bypass)+' t/mois). Au-delà du plafond GTA, cette vapeur n’est pas valorisée en électricité.';
+  } else alertB.classList.add('hidden');
+
+  const alertI = document.getElementById('alertInfo');
+  const besoinCh = pt.nbCh;
+  if (nbDispo < besoinCh){
+    alertI.classList.remove('hidden');
+    alertI.innerHTML = '<i class="fa-solid fa-circle-info mr-1"></i> Capacité chaudière insuffisante : le modèle requiert '+besoinCh+' unité(s) à cette charge ('+fmt(prodSAP/C.HEURES_MOIS,1)+' t/h vs '+fmt(C.CAP_CHAUDIERE_UNIT,1)+' t/h par unité).';
+  } else if (nbDispo < 2){
+    alertI.classList.remove('hidden');
+    alertI.innerHTML = '<i class="fa-solid fa-circle-info mr-1"></i> '+nbDispo+' chaudière(s) cochée(s). Charge actuelle : '+fmt(prodSAP/C.HEURES_MOIS,1)+' t/h.';
+  } else alertI.classList.add('hidden');
+
+  const star = DATA && DATA.optimal ? DATA.optimal[tranche] : null;
+  const margeStar = star ? star.marge_optimale_DH_mois : evaluatePoint(103500, prix, fac).marge;
+  const eco = margeStar - pt.marge;
+
+  document.getElementById('kpiMwh').textContent = fmt(pt.mwh,0)+' MWh/mois';
+  document.getElementById('kpiMarge').textContent = fmt(pt.marge/1e6,2)+' MDH/mois';
+  document.getElementById('kpiMargeStar').textContent = fmt(margeStar/1e6,2)+' MDH/mois';
+  const ecoEl = document.getElementById('kpiEco');
+  ecoEl.textContent = (eco>=0?'−':'')+fmt(Math.abs(eco)/1e6,2)+' MDH/mois';
+  ecoEl.classList.toggle('text-emerald-700', eco<=0);
+  ecoEl.classList.toggle('text-red-600', eco>0);
+}
+
+function polyline(svg, values, {min, max, color='#31473C', yRef=null}={}){
+  const w=800, h=160, pad=10;
+  if (!values.length) return;
+  const lo = min ?? Math.min(...values);
+  const hi = max ?? Math.max(...values);
+  const span = hi-lo || 1;
+  const x = i => pad + i*(w-2*pad)/Math.max(values.length-1,1);
+  const y = v => h-pad - (v-lo)/span*(h-2*pad);
+  const pts = values.map((v,i)=>x(i)+','+y(v)).join(' ');
+  let extra = '';
+  if (yRef != null){
+    extra += `<line x1="${pad}" x2="${w-pad}" y1="${y(yRef)}" y2="${y(yRef)}" stroke="#D4AF37" stroke-dasharray="5 4" stroke-width="1.5"/>`;
+  }
+  svg.setAttribute('viewBox','0 0 '+w+' '+h);
+  svg.innerHTML = extra
+    + `<polyline fill="none" stroke="${color}" stroke-width="2.5" stroke-linejoin="round" points="${pts}"/>`
+    + values.map((v,i)=>`<circle cx="${x(i)}" cy="${y(v)}" r="3.5" fill="${color}" stroke="#fff" stroke-width="1"/>`).join('');
+}
+
+function renderHeadline(){
+  if (!DATA) return;
+  const opt = DATA.optimal && DATA.optimal.centrale;
+  if (opt) document.getElementById('hiStar').textContent = fmt(opt.prodSAP_star_t_mois)+' t/mois';
+  const k3 = DATA.kpi && DATA.kpi.synthese && DATA.kpi.synthese.kpi3_realisation_marge;
+  if (k3){
+    document.getElementById('hiReal').textContent = fmt(k3.taux_realisation_moyen,1)+' %';
+    document.getElementById('hiGap').textContent = fmt(k3.manque_a_gagner_DH_an/1e6,1)+' MDH/an';
+  }
+  const k1 = DATA.kpi && DATA.kpi.synthese && DATA.kpi.synthese.kpi1_consommation_specifique;
+  if (k1) document.getElementById('hiKpi1').textContent = fmt(k1.moyenne_regime_nominal,1)+' kg/t';
+}
+
+function renderHistorique(){
+  const statusEl = document.getElementById('histStatus');
+  if (!DATA){ statusEl.textContent = 'Données indisponibles.'; return; }
+  statusEl.textContent = 'Généré le '+new Date(DATA.generated_at).toLocaleString('fr-FR')+' — '+DATA.historique.length+' mois';
+  const rows = DATA.historique;
+  polyline(document.getElementById('chartProd'), rows.map(r=>r.prod_sap), {yRef: DATA.seuil_regime_nominal || 85000});
+  let html = '<tr><th>Mois</th><th>ProdSAP</th><th>Vapeur HP</th><th>Bypass</th><th>Pertes %</th><th>Élec. MWh</th><th>H GTA</th></tr>';
+  rows.forEach((row)=>{
+    const pertes = row.vapeur_hp ? row.bypass/row.vapeur_hp*100 : 0;
+    const nom = row.prod_sap >= (DATA.seuil_regime_nominal||85000);
+    html += `<tr class="${nom?'':'out'}">
+      <td>${row.mois.slice(0,7)}</td>
+      <td>${fmt(row.prod_sap)}</td>
+      <td>${fmt(row.vapeur_hp)}</td>
+      <td>${fmt(row.bypass)}</td>
+      <td>${fmt(pertes,2)}</td>
+      <td>${fmt(row.e_reel)}</td>
+      <td>${fmt(row.heures_gta,1)}</td></tr>`;
+  });
+  document.getElementById('histTable').innerHTML = html;
+  const reg = DATA.regression || {};
+  document.getElementById('histRegressionNote').textContent =
+    'Régression de contrôle E_réel(ProdSAP), degré '+(reg.degree||'–')+' : R² = '+(reg.r2??'–')
+    +' sur '+(reg.n_points||'–')+' points. L’optimum ci-dessus vient de la grille officielle, pas de ce fit.';
+}
+
+function renderBacktest(){
+  if (!DATA || !DATA.backtesting){
+    document.getElementById('btStatus').textContent = 'Lance python main.py pour calculer le backtesting.';
+    return;
+  }
+  const s = DATA.backtesting.synthese;
+  document.getElementById('btStatus').textContent =
+    'Prix central '+fmt(s.prix_elec_DH_par_MWh,2)+' DH/MWh — '+s.n_mois_retenus+' mois dans le domaine (ProdSAP ≥ '
+    +fmt(s.seuil_validite_t_mois)+'). Exclus : '+(s.mois_exclus||[]).join(', ')+'.';
+  const bars = document.getElementById('btBars');
+  bars.innerHTML = '';
+  DATA.backtesting.detail.forEach(r=>{
+    const ok = r.dans_domaine;
+    const width = ok ? Math.min(Math.max(r.taux_realisation_pct, 0), 100) : 0;
+    const fill = ok ? 'bg-amber-500' : 'bg-slate-200';
+    bars.innerHTML += `<div class="flex items-center gap-3 text-xs mb-1.5">
+      <span class="w-16 font-medium text-slate-600">${r.mois_str}</span>
+      <div class="flex-1 h-2.5 bg-slate-100 rounded-full overflow-hidden">
+        <div class="h-full rounded-full ${fill}" style="width:${width}%"></div>
+      </div>
+      <span class="w-24 text-right font-semibold ${ok?'text-slate-700':'text-slate-400'}">${ok ? fmt(r.taux_realisation_pct,1)+' %' : 'hors domaine'}</span>
+    </div>`;
+  });
+  let html = '<tr><th>Mois</th><th>ProdSAP</th><th>Marge réelle</th><th>Marge modèle</th><th>Écart</th><th>Réalisation</th></tr>';
+  DATA.backtesting.detail.forEach((r)=>{
+    html += `<tr class="${r.dans_domaine?'':'out'}">
+      <td>${r.mois_str}</td><td>${fmt(r.prod_sap)}</td>
+      <td>${fmt(r.marge_reelle/1e6,2)} MDH</td>
+      <td>${fmt(r.marge_optimale/1e6,2)} MDH</td>
+      <td>${fmt(r.ecart/1e6,2)}</td>
+      <td>${fmt(r.taux_realisation_pct,1)} %</td></tr>`;
+  });
+  document.getElementById('btTable').innerHTML = html;
+}
+
+function renderSensi(){
+  if (!DATA || !DATA.sensibilite) return;
+  const charge = DATA.sensibilite.sensibilite_charge_sap;
+  polyline(document.getElementById('chartSensi'), charge.map(r=>r.marge_MDH_mois), {color:'#31473C'});
+  let html = '<tr><th>Δ charge</th><th>ProdSAP</th><th>Marge</th><th>% de l’opt.</th></tr>';
+  charge.forEach(r=>{
+    html += `<tr class="${r.variation_pct===0?'opt':''}">
+      <td>${r.variation_pct>0?'+':''}${r.variation_pct} %</td>
+      <td>${fmt(r.prodsap_t_mois)}</td>
+      <td>${fmt(r.marge_MDH_mois,3)} MDH</td>
+      <td>${fmt(r.pct_de_optimal,1)} %</td></tr>`;
+  });
+  document.getElementById('sensiTable').innerHTML = html;
+  document.getElementById('dirtyCards').innerHTML = DATA.sensibilite.sensibilite_dirty_clean.map(r=>`
+    <div class="bg-slate-50 rounded-xl p-4 border-l-4 ${r.ecart_marge_pct<0?'border-amber-500':'border-pmp-sage'}">
+      <div class="text-[11px] font-semibold text-slate-500 uppercase">Charge ${r.charge_design_pct}% · ${fmt(r.prodsap_t_mois)} t/mois</div>
+      <div class="text-2xl font-bold text-pmp-sage mt-1">${fmt(r.ecart_marge_pct,2)} %</div>
+      <div class="text-[11px] text-slate-500 mt-1">Clean ${fmt(r.marge_clean_MDH_mois,3)} vs Dirty ${fmt(r.marge_dirty_MDH_mois,3)} MDH — export ${fmt(r.ecart_export_pct,2)} %</div>
+    </div>
+  `).join('');
+  document.getElementById('sensiNote').textContent = DATA.sensibilite.note || '';
+}
+
+function updateOptimal(){
+  if (!DATA || !DATA.optimal) return;
+  const opt = DATA.optimal[document.getElementById('scenarioSelect').value];
+  if (!opt) return;
+  document.getElementById('histProdSAP').textContent = fmt(opt.prodSAP_star_t_mois)+' t/mois';
+  document.getElementById('histExport').textContent = fmt(opt.export_GTA_star_t_mois)+' t/mois';
+  document.getElementById('histBypass').textContent = fmt(opt.bypass_star_t_mois)+' t/mois';
+  document.getElementById('histMarge').textContent = fmt(opt.marge_optimale_DH_mois/1e6,2)+' MDH/mois';
+}
+
+function switchMode(mode){
+  document.getElementById('modeDemo').classList.toggle('hidden', mode!=='demo');
+  document.getElementById('modeHistorique').classList.toggle('hidden', mode!=='historique');
+  document.getElementById('modeBacktest').classList.toggle('hidden', mode!=='backtest');
+  const sensi = document.getElementById('modeSensi');
+  const showSensi = mode==='sensi';
+  sensi.classList.toggle('hidden', !showSensi);
+  sensi.classList.toggle('grid', showSensi);
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.toggle('active', b.dataset.mode===mode));
+}
+
+function resetDefaults(){
+  const star = (DATA && DATA.optimal && DATA.optimal.centrale)
+    ? DATA.optimal.centrale.prodSAP_star_t_mois : 103500;
+  document.getElementById('prodSAP').value = star;
+  document.getElementById('inputSap').value = star;
+  document.getElementById('tranche').value = 'centrale';
+  document.getElementById('ch1').checked = true;
+  document.getElementById('ch2').checked = true;
+  document.querySelector('input[name=regime][value=normal]').checked = true;
+  recalc();
+}
+
+function exportReport(){
+  const sap = document.getElementById('prodSAP').value;
+  const text = [
+    '=== RAPPORT PIPELINE PMP — BOUCLE EAU-VAPEUR ===',
+    'Date : '+new Date().toLocaleString('fr-FR'),
+    'Complexe OCP Jorf Lasfar — Unité PMP',
+    '-----------------------------------------------------',
+    'Charge SAP : '+fmt(+sap)+' t/mois',
+    'Électricité : '+document.getElementById('kpiMwh').textContent,
+    'Marge à cette charge : '+document.getElementById('kpiMarge').textContent,
+    'Marge ProdSAP* : '+document.getElementById('kpiMargeStar').textContent,
+    'Écart vs optimum : '+document.getElementById('kpiEco').textContent,
+    'ProdSAP* (central) : '+document.getElementById('hiStar').textContent,
+    'Réalisation : '+document.getElementById('hiReal').textContent,
+    'Manque à gagner : '+document.getElementById('hiGap').textContent,
+    'Conso. spécifique : '+document.getElementById('hiKpi1').textContent,
+    '-----------------------------------------------------',
+    'Source : pipeline Python (transform.py, constantes officielles Ch.6)'
+  ].join('\n');
+  const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+  const link = document.createElement('a');
+  link.href = URL.createObjectURL(blob);
+  link.download = 'PMP_Rapport_Pilotage_'+sap+'t.txt';
+  link.click();
+}
+
+function boot(data){
+  DATA = data;
+  if (DATA && DATA.constantes) C = Object.assign({}, FALLBACK_C, DATA.constantes);
+  const slider = document.getElementById('prodSAP');
+  if (DATA && DATA.optimal && DATA.optimal.centrale){
+    slider.value = DATA.optimal.centrale.prodSAP_star_t_mois;
+  }
+  renderHeadline();
+  renderHistorique();
+  renderBacktest();
+  renderSensi();
+  updateOptimal();
+  recalc();
+}
+
+async function loadData(){
+  if (window.PIPELINE_DATA){ boot(window.PIPELINE_DATA); return; }
+  try{
+    const res = await fetch('output/dashboard_data.json');
+    if (!res.ok) throw new Error('HTTP '+res.status);
+    boot(await res.json());
+  } catch(e){
+    document.getElementById('histStatus').innerHTML =
+      'Impossible de charger les sorties ('+e.message+'). Lance <code>python main.py --serve</code>.';
+    recalc();
+  }
+}
+
+document.getElementById('prodSAP').addEventListener('input', recalc);
+document.getElementById('inputSap').addEventListener('input', function(){
+  document.getElementById('prodSAP').value = this.value;
+  recalc();
+});
+document.querySelectorAll('#modeDemo input, #modeDemo select').forEach(el=>{
+  if (el.id === 'inputSap' || el.id === 'prodSAP') return;
+  el.addEventListener('input', recalc);
+  el.addEventListener('change', recalc);
+});
+document.getElementById('scenarioSelect').addEventListener('change', updateOptimal);
+document.querySelectorAll('.tab-btn').forEach(b => b.addEventListener('click', () => switchMode(b.dataset.mode)));
+loadData();
+</script>
+</body>
+</html>
